@@ -1,0 +1,663 @@
+{% extends "base.html" %}
+
+{% block title %}Billing Management{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0 text-gray-800">Billing Management</h1>
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addBillModal">
+            <i class="fas fa-plus"></i> New Bill
+        </button>
+    </div>
+
+    <!-- Quick Stats -->
+    <div class="row mb-4">
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-primary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                                Total Outstanding
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800" id="total-outstanding">₹0</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-exclamation-triangle fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-success shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                                Today's Collection
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800" id="today-collection">₹0</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-rupee-sign fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-info shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                                Pending Bills
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800" id="pending-bills">0</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-file-invoice fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-warning shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                                This Month's Revenue
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800" id="month-revenue">₹0</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-chart-line fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Search and Filter -->
+    <div class="card shadow mb-4">
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-3">
+                    <input type="text" class="form-control" id="searchBills" placeholder="Search bills...">
+                </div>
+                <div class="col-md-2">
+                    <select class="form-select" id="statusFilter">
+                        <option value="">All Status</option>
+                        <option value="paid">Paid</option>
+                        <option value="partial">Partial</option>
+                        <option value="pending">Pending</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <input type="date" class="form-control" id="dateFromFilter" placeholder="From Date">
+                </div>
+                <div class="col-md-2">
+                    <input type="date" class="form-control" id="dateToFilter" placeholder="To Date">
+                </div>
+                <div class="col-md-2">
+                    <button class="btn btn-outline-secondary w-100" onclick="clearFilters()">
+                        <i class="fas fa-times"></i> Clear
+                    </button>
+                </div>
+                <div class="col-md-1">
+                    <button class="btn btn-outline-primary w-100" onclick="exportBills()">
+                        <i class="fas fa-download"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bills Table -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">Bills</h6>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered" id="billsTable">
+                    <thead>
+                        <tr>
+                            <th>Bill ID</th>
+                            <th>Date</th>
+                            <th>Patient Name</th>
+                            <th>Phone</th>
+                            <th>Total Amount</th>
+                            <th>Paid Amount</th>
+                            <th>Balance</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Dynamic content will be loaded here -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Bill Modal -->
+<div class="modal fade" id="addBillModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Create New Bill</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addBillForm">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="billPatientSelect" class="form-label">Patient *</label>
+                                <select class="form-select" id="billPatientSelect" name="patient_id" required>
+                                    <option value="">Select Patient</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="billDate" class="form-label">Bill Date *</label>
+                                <input type="date" class="form-control" id="billDate" name="bill_date" required>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="reportSelect" class="form-label">Associated Report (Optional)</label>
+                                <select class="form-select" id="reportSelect" name="report_id">
+                                    <option value="">Select Report</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="totalAmount" class="form-label">Total Amount *</label>
+                                <input type="number" step="0.01" class="form-control" id="totalAmount" name="total_amount" required>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="paidAmount" class="form-label">Paid Amount</label>
+                                <input type="number" step="0.01" class="form-control" id="paidAmount" name="paid_amount" value="0">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="paymentMethod" class="form-label">Payment Method</label>
+                                <select class="form-select" id="paymentMethod" name="payment_method">
+                                    <option value="">Select Method</option>
+                                    <option value="cash">Cash</option>
+                                    <option value="card">Card</option>
+                                    <option value="upi">UPI</option>
+                                    <option value="bank_transfer">Bank Transfer</option>
+                                    <option value="cheque">Cheque</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="billNotes" class="form-label">Notes</label>
+                        <textarea class="form-control" id="billNotes" name="notes" rows="3"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveBill()">Create Bill</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- View Bill Modal -->
+<div class="modal fade" id="viewBillModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Bill Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="billDetails">
+                <!-- Bill details will be loaded here -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-info" onclick="downloadBillPDF()">
+                    <i class="fas fa-download"></i> Download PDF
+                </button>
+                <button type="button" class="btn btn-success" onclick="recordPayment()">
+                    <i class="fas fa-credit-card"></i> Record Payment
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Payment Modal -->
+<div class="modal fade" id="paymentModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Record Payment</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="paymentForm">
+                    <div class="mb-3">
+                        <label class="form-label">Outstanding Amount</label>
+                        <input type="text" class="form-control" id="outstandingAmount" readonly>
+                    </div>
+                    <div class="mb-3">
+                        <label for="paymentAmountInput" class="form-label">Payment Amount *</label>
+                        <input type="number" step="0.01" class="form-control" id="paymentAmountInput" name="amount" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="paymentMethodInput" class="form-label">Payment Method *</label>
+                        <select class="form-select" id="paymentMethodInput" name="payment_method" required>
+                            <option value="">Select Method</option>
+                            <option value="cash">Cash</option>
+                            <option value="card">Card</option>
+                            <option value="upi">UPI</option>
+                            <option value="bank_transfer">Bank Transfer</option>
+                            <option value="cheque">Cheque</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="paymentNotes" class="form-label">Notes</label>
+                        <textarea class="form-control" id="paymentNotes" name="notes" rows="3"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success" onclick="savePayment()">Record Payment</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentBillId = null;
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadBills();
+    loadPatients();
+    loadBillingSummary();
+    
+    // Set today's date as default
+    document.getElementById('billDate').value = new Date().toISOString().split('T')[0];
+    
+    // Setup search and filters
+    document.getElementById('searchBills').addEventListener('input', filterBills);
+    document.getElementById('statusFilter').addEventListener('change', filterBills);
+    document.getElementById('dateFromFilter').addEventListener('change', filterBills);
+    document.getElementById('dateToFilter').addEventListener('change', filterBills);
+    
+    // Auto-calculate balance
+    document.getElementById('totalAmount').addEventListener('input', calculateBalance);
+    document.getElementById('paidAmount').addEventListener('input', calculateBalance);
+});
+
+function loadBills() {
+    showLoading();
+    fetch('/api/bills')
+        .then(response => response.json())
+        .then(data => {
+            hideLoading();
+            if (data.success) {
+                populateBillsTable(data.data);
+            } else {
+                showToast('Error loading bills: ' + data.error, 'error');
+            }
+        })
+        .catch(error => {
+            hideLoading();
+            console.error('Error:', error);
+            showToast('Error loading bills', 'error');
+        });
+}
+
+function loadPatients() {
+    fetch('/api/patients')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const select = document.getElementById('billPatientSelect');
+                select.innerHTML = '<option value="">Select Patient</option>';
+                data.data.forEach(patient => {
+                    const option = document.createElement('option');
+                    option.value = patient.patient_id;
+                    option.textContent = `${patient.first_name} ${patient.last_name} - ${patient.phone_number}`;
+                    select.appendChild(option);
+                });
+            }
+        })
+        .catch(error => console.error('Error loading patients:', error));
+}
+
+function loadBillingSummary() {
+    // Load billing summary stats
+    fetch('/api/analytics/overview')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const summary = data.data.revenue_summary;
+                document.getElementById('total-outstanding').textContent = formatCurrency(summary.outstanding_amount);
+                document.getElementById('month-revenue').textContent = formatCurrency(summary.total_revenue);
+                
+                // Calculate today's collection and pending bills from bills data
+                fetch('/api/bills')
+                    .then(response => response.json())
+                    .then(billData => {
+                        if (billData.success) {
+                            const today = new Date().toISOString().split('T')[0];
+                            const todayCollection = billData.data
+                                .filter(bill => bill.bill_date === today)
+                                .reduce((sum, bill) => sum + bill.paid_amount, 0);
+                            
+                            const pendingBills = billData.data
+                                .filter(bill => bill.payment_status === 'pending').length;
+                            
+                            document.getElementById('today-collection').textContent = formatCurrency(todayCollection);
+                            document.getElementById('pending-bills').textContent = pendingBills;
+                        }
+                    });
+            }
+        })
+        .catch(error => console.error('Error loading billing summary:', error));
+}
+
+function populateBillsTable(bills) {
+    const tbody = document.querySelector('#billsTable tbody');
+    tbody.innerHTML = '';
+    
+    bills.forEach(bill => {
+        const row = tbody.insertRow();
+        const balance = bill.total_amount - bill.paid_amount;
+        const statusBadge = getPaymentStatusBadge(bill.payment_status);
+        
+        row.innerHTML = `
+            <td>${bill.bill_id}</td>
+            <td>${formatDate(bill.bill_date)}</td>
+            <td>${bill.first_name} ${bill.last_name}</td>
+            <td>${bill.phone_number}</td>
+            <td>${formatCurrency(bill.total_amount)}</td>
+            <td>${formatCurrency(bill.paid_amount)}</td>
+            <td>${formatCurrency(balance)}</td>
+            <td>${statusBadge}</td>
+            <td>
+                <div class="btn-group" role="group">
+                    <button class="btn btn-sm btn-outline-primary" onclick="viewBill(${bill.bill_id})" title="View Details">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-success" onclick="downloadBillPDF(${bill.bill_id})" title="Download PDF">
+                        <i class="fas fa-download"></i>
+                    </button>
+                    ${balance > 0 ? `
+                    <button class="btn btn-sm btn-outline-warning" onclick="recordPaymentForBill(${bill.bill_id})" title="Record Payment">
+                        <i class="fas fa-credit-card"></i>
+                    </button>
+                    ` : ''}
+                </div>
+            </td>
+        `;
+    });
+}
+
+function getPaymentStatusBadge(status) {
+    const statusMap = {
+        'paid': 'bg-success',
+        'partial': 'bg-warning',
+        'pending': 'bg-danger'
+    };
+    return `<span class="badge ${statusMap[status] || 'bg-secondary'}">${status.toUpperCase()}</span>`;
+}
+
+function filterBills() {
+    const searchTerm = document.getElementById('searchBills').value.toLowerCase();
+    const statusFilter = document.getElementById('statusFilter').value;
+    const dateFromFilter = document.getElementById('dateFromFilter').value;
+    const dateToFilter = document.getElementById('dateToFilter').value;
+    
+    const rows = document.querySelectorAll('#billsTable tbody tr');
+    
+    rows.forEach(row => {
+        const text = row.textContent.toLowerCase();
+        const status = row.cells[7].textContent.toLowerCase();
+        const date = row.cells[1].textContent;
+        
+        let show = true;
+        
+        if (searchTerm && !text.includes(searchTerm)) {
+            show = false;
+        }
+        
+        if (statusFilter && !status.includes(statusFilter)) {
+            show = false;
+        }
+        
+        if (dateFromFilter && date < dateFromFilter) {
+            show = false;
+        }
+        
+        if (dateToFilter && date > dateToFilter) {
+            show = false;
+        }
+        
+        row.style.display = show ? '' : 'none';
+    });
+}
+
+function clearFilters() {
+    document.getElementById('searchBills').value = '';
+    document.getElementById('statusFilter').value = '';
+    document.getElementById('dateFromFilter').value = '';
+    document.getElementById('dateToFilter').value = '';
+    filterBills();
+}
+
+function calculateBalance() {
+    const total = parseFloat(document.getElementById('totalAmount').value) || 0;
+    const paid = parseFloat(document.getElementById('paidAmount').value) || 0;
+    // You could add a balance display field if needed
+}
+
+function saveBill() {
+    const form = document.getElementById('addBillForm');
+    const formData = new FormData(form);
+    
+    const billData = {
+        patient_id: parseInt(formData.get('patient_id')),
+        bill_date: formData.get('bill_date'),
+        total_amount: parseFloat(formData.get('total_amount')),
+        paid_amount: parseFloat(formData.get('paid_amount')) || 0,
+        payment_method: formData.get('payment_method'),
+        notes: formData.get('notes')
+    };
+    
+    if (formData.get('report_id')) {
+        billData.report_id = parseInt(formData.get('report_id'));
+    }
+    
+    showLoading();
+    fetch('/api/bills', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(billData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        hideLoading();
+        if (data.success) {
+            showToast('Bill created successfully', 'success');
+            document.getElementById('addBillForm').reset();
+            bootstrap.Modal.getInstance(document.getElementById('addBillModal')).hide();
+            loadBills();
+            loadBillingSummary();
+        } else {
+            showToast('Error creating bill: ' + data.error, 'error');
+        }
+    })
+    .catch(error => {
+        hideLoading();
+        console.error('Error:', error);
+        showToast('Error creating bill', 'error');
+    });
+}
+
+function viewBill(billId) {
+    currentBillId = billId;
+    showLoading();
+    
+    fetch(`/api/bills/${billId}`)
+        .then(response => response.json())
+        .then(data => {
+            hideLoading();
+            if (data.success) {
+                displayBillDetails(data.data);
+                new bootstrap.Modal(document.getElementById('viewBillModal')).show();
+            } else {
+                showToast('Error loading bill details: ' + data.error, 'error');
+            }
+        })
+        .catch(error => {
+            hideLoading();
+            console.error('Error:', error);
+            showToast('Error loading bill details', 'error');
+        });
+}
+
+function displayBillDetails(bill) {
+    const container = document.getElementById('billDetails');
+    const balance = bill.total_amount - bill.paid_amount;
+    
+    container.innerHTML = `
+        <div class="row">
+            <div class="col-md-6">
+                <h6>Bill Information</h6>
+                <p><strong>Bill ID:</strong> ${bill.bill_id}</p>
+                <p><strong>Bill Date:</strong> ${formatDate(bill.bill_date)}</p>
+                <p><strong>Total Amount:</strong> ${formatCurrency(bill.total_amount)}</p>
+                <p><strong>Paid Amount:</strong> ${formatCurrency(bill.paid_amount)}</p>
+                <p><strong>Balance:</strong> ${formatCurrency(balance)}</p>
+                <p><strong>Payment Status:</strong> ${getPaymentStatusBadge(bill.payment_status)}</p>
+                <p><strong>Payment Method:</strong> ${bill.payment_method || 'N/A'}</p>
+                <p><strong>Notes:</strong> ${bill.notes || 'None'}</p>
+            </div>
+            <div class="col-md-6">
+                <h6>Patient Information</h6>
+                <p><strong>Name:</strong> ${bill.first_name} ${bill.last_name}</p>
+                <p><strong>Phone:</strong> ${bill.phone_number}</p>
+                <p><strong>Date of Birth:</strong> ${bill.date_of_birth || 'N/A'}</p>
+                <p><strong>Gender:</strong> ${bill.gender || 'N/A'}</p>
+                <p><strong>Address:</strong> ${bill.address || 'N/A'}</p>
+            </div>
+        </div>
+    `;
+}
+
+function downloadBillPDF(billId = null) {
+    const id = billId || currentBillId;
+    if (id) {
+        window.open(`/api/bills/${id}/pdf`, '_blank');
+    }
+}
+
+function recordPayment() {
+    recordPaymentForBill(currentBillId);
+}
+
+function recordPaymentForBill(billId) {
+    currentBillId = billId;
+    
+    // Get bill details to show outstanding amount
+    fetch(`/api/bills/${billId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const bill = data.data;
+                const outstanding = bill.total_amount - bill.paid_amount;
+                document.getElementById('outstandingAmount').value = formatCurrency(outstanding);
+                document.getElementById('paymentAmountInput').value = outstanding;
+                new bootstrap.Modal(document.getElementById('paymentModal')).show();
+            }
+        })
+        .catch(error => console.error('Error:', error));
+}
+
+function savePayment() {
+    const form = document.getElementById('paymentForm');
+    const formData = new FormData(form);
+    
+    const paymentData = {
+        amount: parseFloat(formData.get('amount')),
+        payment_method: formData.get('payment_method'),
+        notes: formData.get('notes')
+    };
+    
+    showLoading();
+    fetch(`/api/bills/${currentBillId}/payment`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(paymentData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        hideLoading();
+        if (data.success) {
+            showToast('Payment recorded successfully', 'success');
+            document.getElementById('paymentForm').reset();
+            bootstrap.Modal.getInstance(document.getElementById('paymentModal')).hide();
+            loadBills();
+            loadBillingSummary();
+            if (bootstrap.Modal.getInstance(document.getElementById('viewBillModal'))) {
+                viewBill(currentBillId); // Refresh bill details if open
+            }
+        } else {
+            showToast('Error recording payment: ' + data.error, 'error');
+        }
+    })
+    .catch(error => {
+        hideLoading();
+        console.error('Error:', error);
+        showToast('Error recording payment', 'error');
+    });
+}
+
+function exportBills() {
+    const fromDate = document.getElementById('dateFromFilter').value;
+    const toDate = document.getElementById('dateToFilter').value;
+    
+    let url = '/api/export/excel?type=bills';
+    if (fromDate) url += `&start_date=${fromDate}`;
+    if (toDate) url += `&end_date=${toDate}`;
+    
+    window.open(url, '_blank');
+}
+</script>
+{% endblock %} 

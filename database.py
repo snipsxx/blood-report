@@ -9,8 +9,10 @@ class LabDatabase:
         self.init_database()
     
     def get_connection(self):
-        """Get database connection"""
-        return sqlite3.connect(self.db_path)
+        """Get database connection with row factory"""
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        return conn
     
     def init_database(self):
         """Initialize database with all required tables"""

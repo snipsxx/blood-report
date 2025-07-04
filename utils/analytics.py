@@ -3,7 +3,7 @@ from datetime import datetime, date, timedelta
 from typing import Dict, List, Any, Tuple
 import calendar
 
-class LabAnalytics:
+class AnalyticsEngine:
     def __init__(self, database):
         self.db = database
     
@@ -201,14 +201,19 @@ class LabAnalytics:
         finally:
             conn.close()
     
-    def get_daily_revenue_trend(self, days: int = 30) -> List[Dict[str, Any]]:
+    def get_daily_revenue_trend(self, start_date: str = None, end_date: str = None, days: int = 30) -> List[Dict[str, Any]]:
         """Get daily revenue trend for specified number of days"""
         conn = self.db.get_connection()
         cursor = conn.cursor()
         
         try:
-            end_date = date.today()
-            start_date = end_date - timedelta(days=days-1)
+            # Use provided dates or default to last 'days' days
+            if start_date and end_date:
+                start_dt = datetime.strptime(start_date, '%Y-%m-%d').date()
+                end_dt = datetime.strptime(end_date, '%Y-%m-%d').date()
+            else:
+                end_dt = date.today()
+                start_dt = end_dt - timedelta(days=days-1)
             
             cursor.execute('''
                 SELECT 
@@ -220,7 +225,7 @@ class LabAnalytics:
                 WHERE bill_date BETWEEN ? AND ?
                 GROUP BY bill_date
                 ORDER BY bill_date
-            ''', (start_date.strftime('%Y-%m-%d'), end_date.strftime('%Y-%m-%d')))
+            ''', (start_dt.strftime('%Y-%m-%d'), end_dt.strftime('%Y-%m-%d')))
             
             revenue_data = []
             for row in cursor.fetchall():
@@ -428,6 +433,176 @@ class LabAnalytics:
                     'revenue': calculate_growth(current_metrics[3], last_metrics[3])
                 }
             }
+            
+        finally:
+            conn.close()
+    
+    def get_payment_method_distribution(self) -> List[Dict[str, Any]]:
+        """Get distribution of payment methods"""
+        conn = self.db.get_connection()
+        cursor = conn.cursor()
+        
+        try:
+            cursor.execute('''
+                SELECT 
+                    COALESCE(payment_method, 'Not Specified') as method,
+                    COUNT(*) as count,
+                    SUM(paid_amount) as total_amount
+                FROM bills 
+                WHERE paid_amount > 0
+                GROUP BY payment_method
+                ORDER BY total_amount DESC
+            ''')
+            
+            methods = []
+            for row in cursor.fetchall():
+                methods.append({
+                    'method': row[0],
+                    'count': row[1],
+                    'amount': row[2]
+                })
+            
+            return methods
+            
+        finally:
+            conn.close()
+    
+    def get_collection_vs_revenue(self) -> Dict[str, Any]:
+        """Get collection vs revenue comparison"""
+        conn = self.db.get_connection()
+        cursor = conn.cursor()
+        
+        try:
+            # Get monthly collection vs revenue for last 12 months
+            today = date.today()
+            monthly_data = []
+            
+            for i in range(12):
+                month_date = today.replace(day=1) - timedelta(days=i*30)
+                month_start = month_date.replace(day=1)
+                last_day = calendar.monthrange(month_start.year, month_start.month)[1]
+                month_end = month_start.replace(day=last_day)
+                
+                cursor.execute('''
+                    SELECT 
+                        COALESCE(SUM(total_amount), 0) as revenue,
+                        COALESCE(SUM(paid_amount), 0) as collection
+                    FROM bills 
+                    WHERE bill_date BETWEEN ? AND ?
+                ''', (month_start.strftime('%Y-%m-%d'), month_end.strftime('%Y-%m-%d')))
+                
+                result = cursor.fetchone()
+                monthly_data.append({
+                    'month': month_start.strftime('%Y-%m'),
+                    'month_name': month_start.strftime('%b %Y'),
+                    'revenue': result[0],
+                    'collection': result[1],
+                    'collection_rate': (result[1] / result[0] * 100) if result[0] > 0 else 0
+                })
+            
+            return {
+                'monthly_data': list(reversed(monthly_data))
+            }
+            
+        finally:
+            conn.close()
+    
+    def get_popular_tests(self) -> List[Dict[str, Any]]:
+        """Get most popular tests"""
+        conn = self.db.get_connection()
+        cursor = conn.cursor()
+        
+        try:
+            cursor.execute('''
+                SELECT 
+                    tt.test_name,
+                    tt.test_code,
+                    COUNT(*) as count,
+                    SUM(tt.price) as revenue
+                FROM test_results tr
+                JOIN test_types tt ON tr.test_type_id = tt.test_type_id
+                JOIN blood_reports br ON tr.report_id = br.report_id
+                WHERE br.test_date >= date('now', '-30 days')
+                GROUP BY tt.test_type_id, tt.test_name, tt.test_code, tt.price
+                ORDER BY count DESC
+                LIMIT 10
+            ''')
+            
+            tests = []
+            for row in cursor.fetchall():
+                tests.append({
+                    'test_name': row[0],
+                    'test_code': row[1],
+                    'count': row[2],
+                    'revenue': row[3]
+                })
+            
+            return tests
+            
+        finally:
+            conn.close()
+    
+    def get_test_results_distribution(self) -> Dict[str, Any]:
+        """Get distribution of test results"""
+        conn = self.db.get_connection()
+        cursor = conn.cursor()
+        
+        try:
+            cursor.execute('''
+                SELECT 
+                    SUM(CASE WHEN is_normal = 1 THEN 1 ELSE 0 END) as normal,
+                    SUM(CASE WHEN is_normal = 0 THEN 1 ELSE 0 END) as abnormal,
+                    SUM(CASE WHEN is_normal IS NULL THEN 1 ELSE 0 END) as pending
+                FROM test_results tr
+                JOIN blood_reports br ON tr.report_id = br.report_id
+                WHERE br.test_date >= date('now', '-30 days')
+            ''')
+            
+            result = cursor.fetchone()
+            return {
+                'normal': result[0] or 0,
+                'abnormal': result[1] or 0,
+                'pending': result[2] or 0
+            }
+            
+        finally:
+            conn.close()
+    
+    def get_abnormality_rates(self) -> List[Dict[str, Any]]:
+        """Get abnormality rates by test type"""
+        conn = self.db.get_connection()
+        cursor = conn.cursor()
+        
+        try:
+            cursor.execute('''
+                SELECT 
+                    tt.test_name,
+                    COUNT(*) as total_tests,
+                    SUM(CASE WHEN tr.is_normal = 0 THEN 1 ELSE 0 END) as abnormal_count,
+                    ROUND(
+                        (SUM(CASE WHEN tr.is_normal = 0 THEN 1 ELSE 0 END) * 100.0 / COUNT(*)), 2
+                    ) as abnormality_rate
+                FROM test_results tr
+                JOIN test_types tt ON tr.test_type_id = tt.test_type_id
+                JOIN blood_reports br ON tr.report_id = br.report_id
+                WHERE br.test_date >= date('now', '-90 days')
+                AND tr.is_normal IS NOT NULL
+                GROUP BY tt.test_type_id, tt.test_name
+                HAVING total_tests >= 5
+                ORDER BY abnormality_rate DESC
+                LIMIT 10
+            ''')
+            
+            rates = []
+            for row in cursor.fetchall():
+                rates.append({
+                    'test_name': row[0],
+                    'total_tests': row[1],
+                    'abnormal_count': row[2],
+                    'abnormality_rate': row[3]
+                })
+            
+            return rates
             
         finally:
             conn.close() 
